@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect
 from django.conf import settings
-from django.core.files.storage import FileSystemStorage
+from django.core.files.storage import FileSystemStorage, default_storage
 from django.urls import reverse
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 import os
 import time
 import threading
@@ -221,3 +221,11 @@ def auto_crop_note(image):
             warped = four_point_transform(image, pts)
             return warped
     return image  # fallback: return original if no rectangle found
+
+def s3_test(request):
+    try:
+        with default_storage.open('test.txt', 'w') as f:
+            f.write('hello')
+        return HttpResponse('S3 write succeeded')
+    except Exception as e:
+        return HttpResponse(f'S3 write failed: {e}')

@@ -8,4 +8,5 @@ urlpatterns = [
     path('check-progress/<int:image_id>/', views.check_progress, name='check_progress'),
     path('result/<int:image_id>/', views.result, name='result'),
     path('about/', views.about, name='about'),
+    path('s3-test/', views.s3_test, name='s3_test'),
 ] 
