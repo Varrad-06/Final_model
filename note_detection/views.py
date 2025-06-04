@@ -229,3 +229,13 @@ def s3_test(request):
         return HttpResponse('S3 write succeeded')
     except Exception as e:
         return HttpResponse(f'S3 write failed: {e}')
+
+def run_migrations(request):
+    from django.core.management import call_command
+    from django.http import HttpResponse
+    try:
+        call_command('makemigrations', 'note_detection')
+        call_command('migrate')
+        return HttpResponse('Migrations completed successfully.')
+    except Exception as e:
+        return HttpResponse(f'Migration failed: {e}')

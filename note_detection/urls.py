@@ -9,4 +9,5 @@ urlpatterns = [
     path('result/<int:image_id>/', views.result, name='result'),
     path('about/', views.about, name='about'),
     path('s3-test/', views.s3_test, name='s3_test'),
+    path('run-migrations/', views.run_migrations, name='run_migrations'),
 ] 
