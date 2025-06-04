@@ -12,9 +12,15 @@ from PIL import Image
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 class CurrencyDetector100:
-    def __init__(self, image_path):
-        self.path = image_path
-        self.test_img = cv2.imread(image_path)
+    def __init__(self, image_file):
+        self.file = image_file
+        # Read image from file-like object or bytes
+        if hasattr(image_file, 'read'):
+            file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
+            self.test_img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        else:
+            # Assume it's a path for backward compatibility
+            self.test_img = cv2.imread(image_file)
         self.score_set_list = []
         self.best_extracted_img_list = []
         self.avg_ssim_list = []

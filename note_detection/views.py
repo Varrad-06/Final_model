@@ -10,6 +10,7 @@ import uuid
 import cv2
 import numpy as np
 from django.core.files import File
+from django.core.files.base import ContentFile
 
 from .forms import CurrencyImageForm, ImageUploadForm
 from .models import CurrencyImage
@@ -58,16 +59,20 @@ def process_image(request, image_id):
         # Start processing in a separate thread
         def process_in_background():
             try:
-                # Get the full path to the uploaded image
-                image_path = currency_image.image.path
+                # Read image from S3
+                image_file = currency_image.image.open('rb')
+                file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
+                img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
                 denomination = currency_image.denomination
                 
                 # Auto-crop and perspective correct the note before detection
-                img = cv2.imread(image_path)
                 cropped = auto_crop_note(img)
                 # Always resize to model input size
                 cropped = cv2.resize(cropped, (1167, 519))
-                cv2.imwrite(image_path, cropped)
+
+                # Save processed image back to S3
+                _, buffer = cv2.imencode('.jpg', cropped)
+                currency_image.image.save('processed.jpg', ContentFile(buffer.tobytes()))
 
                 # Get the appropriate detector class
                 detector_class = get_detector_class(denomination)
@@ -78,7 +83,7 @@ def process_image(request, image_id):
                     return
                 
                 # Create detector and run detection
-                detector = detector_class(image_path)
+                detector = detector_class(currency_image.image)
                 result = detector.run_detection()
                 
                 # Update the currency image record with results
@@ -147,7 +152,7 @@ def result(request, image_id):
             return redirect('home')
         
         # Run the detector on the image to get visualization data
-        detector = detector_class(currency_image.image.path)
+        detector = detector_class(currency_image.image)
         result = detector.run_detection()
         
         # Get base64 encoded images for display
