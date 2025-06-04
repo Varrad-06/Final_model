@@ -1,0 +1,99 @@
+{% extends 'note_detection/base.html' %}
+
+{% block title %}Processing - Indian Currency Note Detection{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header text-center">
+                <h2 class="mb-0">Processing Your Currency Note</h2>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                
+                <h4 class="mb-3">Please wait while we analyze your currency note...</h4>
+                
+                <div class="progress mb-4" style="height: 25px;">
+                    <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+                
+                <p class="text-muted">This may take up to a minute. Please don't close or refresh this page.</p>
+                
+                <div id="progress-text" class="mt-3">
+                    <p>Running advanced image analysis...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Simulate progress with animation
+        let progress = 0;
+        const progressBar = $('#progress-bar');
+        const progressText = $('#progress-text');
+        
+        const progressSteps = [
+            { value: 10, text: "Preprocessing image..." },
+            { value: 20, text: "Analyzing visual features..." },
+            { value: 40, text: "Checking security elements..." },
+            { value: 60, text: "Detecting bleed lines..." },
+            { value: 80, text: "Verifying number panel..." },
+            { value: 90, text: "Finalizing results..." }
+        ];
+        
+        let stepIndex = 0;
+        
+        // Increment progress animation
+        const progressInterval = setInterval(function() {
+            if (stepIndex < progressSteps.length) {
+                const step = progressSteps[stepIndex];
+                progress = step.value;
+                progressBar.css('width', progress + '%');
+                progressText.html('<p>' + step.text + '</p>');
+                stepIndex++;
+            }
+        }, 3000);
+        
+        // Check if processing is complete
+        function checkProgress() {
+            $.ajax({
+                url: '{% url "check_progress" image_id=image_id %}',
+                method: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    if (data.complete) {
+                        // Clear intervals and redirect to results
+                        clearInterval(progressInterval);
+                        clearInterval(checkInterval);
+                        
+                        progressBar.css('width', '100%');
+                        progressText.html('<p>Analysis complete! Redirecting to results...</p>');
+                        
+                        setTimeout(function() {
+                            window.location.href = data.result_url;
+                        }, 1000);
+                    }
+                },
+                error: function() {
+                    console.log('Error checking progress');
+                }
+            });
+        }
+        
+        // Check progress every 3 seconds
+        const checkInterval = setInterval(checkProgress, 3000);
+        
+        // Initial check
+        checkProgress();
+    });
+</script>
+{% endblock %} 

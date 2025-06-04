@@ -1,0 +1,54 @@
+{% extends 'note_detection/base.html' %}
+
+{% block title %}About - Indian Currency Note Detection{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header text-center">
+                <h2 class="mb-0">About This Project</h2>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <img src="https://www.rbi.org.in/Scripts/images/BS_Images/500-2.jpg" alt="500 Rupee Note" class="img-fluid" style="max-height: 200px;">
+                </div>
+                
+                <h4>Counterfeit Indian Currency Note Detection System</h4>
+                <p>
+                    This system is designed to detect counterfeit Indian 500 rupee notes using image processing and computer vision techniques.
+                    The detection is based on analyzing various security features present in genuine Indian currency notes.
+                </p>
+                
+                <h4 class="mt-4">Key Features</h4>
+                <ul>
+                    <li><strong>Visual Security Features Analysis:</strong> Compares 7 distinct visual security elements against templates of genuine notes.</li>
+                    <li><strong>Bleed Lines Detection:</strong> Analyzes the security bleed lines on both left and right sides of the note.</li>
+                    <li><strong>Number Panel Verification:</strong> Verifies the number panel by detecting all 9 characters that should be present.</li>
+                </ul>
+                
+                <h4 class="mt-4">How It Works</h4>
+                <ol>
+                    <li>Upload a clear image of an Indian 500 rupee note.</li>
+                    <li>The system preprocesses the image (resizing, blurring, grayscale conversion).</li>
+                    <li>Features are extracted and compared with templates of genuine notes.</li>
+                    <li>The results are analyzed to determine if the note is authentic or suspicious.</li>
+                </ol>
+                
+                <h4 class="mt-4">Technology Used</h4>
+                <ul>
+                    <li><strong>Backend:</strong> Django (Python web framework)</li>
+                    <li><strong>Computer Vision:</strong> OpenCV, NumPy, scikit-image</li>
+                    <li><strong>Feature Detection:</strong> ORB (Oriented FAST and Rotated BRIEF)</li>
+                    <li><strong>Similarity Measurement:</strong> Structural Similarity Index (SSIM)</li>
+                    <li><strong>Frontend:</strong> HTML, CSS, Bootstrap, JavaScript</li>
+                </ul>
+                
+                <div class="alert alert-warning mt-4" role="alert">
+                    <strong>Disclaimer:</strong> This system is for educational purposes only. It should not be used as a definitive tool for currency verification in real-world financial transactions.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

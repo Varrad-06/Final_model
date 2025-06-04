@@ -1,0 +1,180 @@
+{% extends 'note_detection/base.html' %}
+
+{% block title %}Home - Indian Currency Note Detection{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header text-center">
+                <h2 class="mb-0">Counterfeit Indian Currency Note Detection</h2>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <img src="https://www.bankbazaar.com/images/india/infographic/new-rs-500-note-features.webp" alt="Indian Currency Notes" class="img-fluid" style="max-height: 200px;">
+                </div>
+                
+                <p class="lead text-center mb-4">
+                    Select the currency denomination and upload an image or capture using camera to check its authenticity.
+                </p>
+                
+                <form method="post" action="{% url 'upload_image' %}" enctype="multipart/form-data" class="mb-3">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label class="form-label d-block text-center mb-3">Select Currency Denomination</label>
+                        <div class="d-flex justify-content-center gap-3">
+                            <input type="radio" class="btn-check" name="denomination" id="denomination100" value="100" autocomplete="off">
+                            <label class="btn btn-outline-primary btn-lg" for="denomination100">
+                                <i class="bi bi-currency-rupee"></i> 100
+                            </label>
+
+                            <input type="radio" class="btn-check" name="denomination" id="denomination200" value="200" autocomplete="off">
+                            <label class="btn btn-outline-primary btn-lg" for="denomination200">
+                                <i class="bi bi-currency-rupee"></i> 200
+                            </label>
+
+                            <input type="radio" class="btn-check" name="denomination" id="denomination500" value="500" autocomplete="off">
+                            <label class="btn btn-outline-primary btn-lg" for="denomination500">
+                                <i class="bi bi-currency-rupee"></i> 500
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.image.id_for_label }}" class="form-label">Select Currency Image</label>
+                        {{ form.image }}
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-center gap-2">
+                            <button type="button" id="startCamera" class="btn btn-outline-primary">
+                                <i class="bi bi-camera"></i> Open Camera
+                            </button>
+                            <button type="button" id="retakeImage" class="btn btn-outline-warning" style="display: none;">
+                                <i class="bi bi-arrow-counterclockwise"></i> Retake
+                            </button>
+                        </div>
+                        <div class="text-center mt-3">
+                            <span id="countdown" style="display:none; font-size: 1.5rem; color: #0d6efd;"></span>
+                        </div>
+                        <div class="text-center mt-3 d-flex justify-content-center">
+                            <div id="cameraContainer" style="position: relative; width: 583.5px; height: 259.5px; margin: 0 auto;">
+                                <video id="video" autoplay playsinline style="width: 100%; height: 100%; display: none; border-radius: 8px; object-fit: cover;"></video>
+                                <canvas id="canvas" style="display: none; width: 100%; height: 100%; border-radius: 8px; position: absolute; top: 0; left: 0;"></canvas>
+                                <div id="cameraOverlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+                                    <div class="border border-3 border-primary rounded" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-upload"></i> Upload & Verify
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="alert alert-info" role="alert">
+                    <h5 class="alert-heading">How it works:</h5>
+                    <p>Our system analyzes several security features of the selected currency note to determine if it's authentic:</p>
+                    <ol>
+                        <li>Visual features comparison with templates</li>
+                        <li>Bleed lines detection</li>
+                        <li>Currency number panel verification</li>
+                    </ol>
+                    <p class="mb-0">The image should be clear, well-lit, and show the entire note without significant folding or damage.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const startCamera = document.getElementById('startCamera');
+    const retakeImage = document.getElementById('retakeImage');
+    const imageInput = document.querySelector('input[type="file"]');
+    const cameraOverlay = document.getElementById('cameraOverlay');
+    let stream = null;
+
+    startCamera.addEventListener('click', async () => {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            video.style.display = 'block';
+            cameraOverlay.style.display = 'block';
+            startCamera.style.display = 'none';
+            document.getElementById('countdown').style.display = 'inline-block';
+            let seconds = 10;
+            document.getElementById('countdown').textContent = `Capturing in ${seconds} seconds...`;
+            let countdownInterval = setInterval(() => {
+                seconds--;
+                document.getElementById('countdown').textContent = `Capturing in ${seconds} seconds...`;
+                if (seconds <= 0) {
+                    clearInterval(countdownInterval);
+                    document.getElementById('countdown').style.display = 'none';
+                    autoCapture();
+                }
+            }, 1000);
+        } catch (err) {
+            console.error('Error accessing camera:', err);
+            alert('Could not access the camera. Please make sure you have granted camera permissions.');
+        }
+    });
+
+    function autoCapture() {
+        if (stream) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            const targetAspect = 1167 / 519;
+            let cropWidth = canvas.width, cropHeight = canvas.height;
+            let cropX = 0, cropY = 0;
+            if (canvas.width / canvas.height > targetAspect) {
+                cropWidth = canvas.height * targetAspect;
+                cropX = (canvas.width - cropWidth) / 2;
+            } else {
+                cropHeight = canvas.width / targetAspect;
+                cropY = (canvas.height - cropHeight) / 2;
+            }
+
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = 1167;
+            cropCanvas.height = 519;
+            const cropCtx = cropCanvas.getContext('2d');
+            cropCtx.drawImage(
+                canvas,
+                cropX, cropY, cropWidth, cropHeight,
+                0, 0, 1167, 519
+            );
+
+            cropCanvas.toBlob((blob) => {
+                const file = new File([blob], 'captured_image.jpg', { type: 'image/jpeg' });
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                imageInput.files = dataTransfer.files;
+
+                video.style.display = 'none';
+                cameraOverlay.style.display = 'none';
+                canvas.style.display = 'block';
+                canvas.width = 1167;
+                canvas.height = 519;
+                canvas.getContext('2d').drawImage(cropCanvas, 0, 0);
+
+                retakeImage.style.display = 'inline-block';
+            }, 'image/jpeg');
+        }
+    }
+
+    retakeImage.addEventListener('click', () => {
+        canvas.style.display = 'none';
+        video.style.display = 'block';
+        cameraOverlay.style.display = 'block';
+        retakeImage.style.display = 'none';
+    });
+</script>
+{% endblock %} 
