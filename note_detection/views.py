@@ -9,6 +9,7 @@ import threading
 import uuid
 import cv2
 import numpy as np
+from django.core.files import File
 
 from .forms import CurrencyImageForm, ImageUploadForm
 from .models import CurrencyImage
@@ -33,33 +34,34 @@ def home(request):
             try:
                 # Get the selected denomination
                 denomination = form.cleaned_data['denomination']
-                
-                # Save the uploaded image
                 image = form.cleaned_data['image']
+
+                # Save the uploaded image to MEDIA_ROOT/uploads
+                upload_dir = os.path.join(settings.MEDIA_ROOT, 'uploads')
+                os.makedirs(upload_dir, exist_ok=True)
                 unique_filename = f"{uuid.uuid4()}_{image.name}"
-                image_path = os.path.join('media', 'uploads', unique_filename)
-                
-                # Ensure the uploads directory exists
-                os.makedirs(os.path.dirname(image_path), exist_ok=True)
-                
-                with open(image_path, 'wb+') as destination:
+                full_path = os.path.join(upload_dir, unique_filename)
+
+                with open(full_path, 'wb+') as destination:
                     for chunk in image.chunks():
                         destination.write(chunk)
-                
-                # Create a new CurrencyImage instance
-                currency_image = CurrencyImage(
-                    image=image,
-                    denomination=denomination
-                )
-                currency_image.save()
-                
+
+                # Save the file to the model using Django's File object
+                with open(full_path, 'rb') as f:
+                    django_file = File(f)
+                    currency_image = CurrencyImage(
+                        image=f'uploads/{unique_filename}',
+                        denomination=denomination
+                    )
+                    currency_image.save()
+
                 # Redirect to processing page
                 return redirect('process_image', image_id=currency_image.id)
-                
+
             except Exception as e:
                 # Clean up the uploaded file if it exists
-                if os.path.exists(image_path):
-                    os.remove(image_path)
+                if os.path.exists(full_path):
+                    os.remove(full_path)
                 return JsonResponse({'error': f'Error processing image: {str(e)}'})
     else:
         form = ImageUploadForm()
