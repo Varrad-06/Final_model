@@ -29,43 +29,12 @@ def get_detector_class(denomination):
 def home(request):
     """Home page view with the currency note upload form"""
     if request.method == 'POST':
-        form = ImageUploadForm(request.POST, request.FILES)
+        form = CurrencyImageForm(request.POST, request.FILES)
         if form.is_valid():
-            try:
-                # Get the selected denomination
-                denomination = form.cleaned_data['denomination']
-                image = form.cleaned_data['image']
-
-                # Save the uploaded image to MEDIA_ROOT/uploads
-                upload_dir = os.path.join(settings.MEDIA_ROOT, 'uploads')
-                os.makedirs(upload_dir, exist_ok=True)
-                unique_filename = f"{uuid.uuid4()}_{image.name}"
-                full_path = os.path.join(upload_dir, unique_filename)
-
-                with open(full_path, 'wb+') as destination:
-                    for chunk in image.chunks():
-                        destination.write(chunk)
-
-                # Save the file to the model using Django's File object
-                with open(full_path, 'rb') as f:
-                    django_file = File(f)
-                    currency_image = CurrencyImage(
-                        image=f'uploads/{unique_filename}',
-                        denomination=denomination
-                    )
-                    currency_image.save()
-
-                # Redirect to processing page
-                return redirect('process_image', image_id=currency_image.id)
-
-            except Exception as e:
-                # Clean up the uploaded file if it exists
-                if os.path.exists(full_path):
-                    os.remove(full_path)
-                return JsonResponse({'error': f'Error processing image: {str(e)}'})
+            currency_image = form.save()
+            return redirect('process_image', image_id=currency_image.id)
     else:
         form = ImageUploadForm()
-    
     return render(request, 'note_detection/home.html', {'form': form})
 
 def upload_image(request):
