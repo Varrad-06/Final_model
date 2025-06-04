@@ -130,7 +130,7 @@
             canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0);
-
+            
             const targetAspect = 1167 / 519;
             let cropWidth = canvas.width, cropHeight = canvas.height;
             let cropX = 0, cropY = 0;
@@ -157,7 +157,7 @@
                 const dataTransfer = new DataTransfer();
                 dataTransfer.items.add(file);
                 imageInput.files = dataTransfer.files;
-
+                
                 video.style.display = 'none';
                 cameraOverlay.style.display = 'none';
                 canvas.style.display = 'block';
