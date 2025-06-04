@@ -73,12 +73,10 @@ def upload_image(request):
     if request.method == 'POST':
         form = CurrencyImageForm(request.POST, request.FILES)
         if form.is_valid():
-            # Save the uploaded image
+            # Save the uploaded image using the model's ImageField
             currency_image = form.save()
-            
             # Redirect to a processing page, passing the image ID
             return redirect('process_image', image_id=currency_image.id)
-    
     # If form is invalid, redirect back to home
     return redirect('home')
 
