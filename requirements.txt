@@ -36,7 +36,6 @@ pyparsing==3.2.2
 Pyro4==4.82
 pytesseract==0.3.13
 python-dateutil==2.9.0.post0
-pywin32==310
 pyzmq==26.3.0
 scikit-image==0.25.2
 scipy==1.15.2
