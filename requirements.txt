@@ -52,3 +52,4 @@ wcwidth==0.2.13
 gunicorn
 django-storages
 boto3
+dj-database-url

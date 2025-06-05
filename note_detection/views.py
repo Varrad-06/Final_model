@@ -11,12 +11,17 @@ import cv2
 import numpy as np
 from django.core.files import File
 from django.core.files.base import ContentFile
+import dj_database_url
 
 from .forms import CurrencyImageForm, ImageUploadForm
 from .models import CurrencyImage
 from .detection import CurrencyDetector100
 from .detection_200 import CurrencyDetector200
 from .detection_500 import CurrencyDetector500
+
+DATABASES = {
+    'default': dj_database_url.config(default=os.environ.get('postgresql://dataset_fgzh_user:pAarrb9wcK6XuG1nSnOxjUvdOZwuVEgE@dpg-d10khlmmcj7s73bq20mg-a/dataset_fgzh'))
+}
 
 def get_detector_class(denomination):
     """Helper function to get the appropriate detector class"""
