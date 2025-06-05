@@ -140,3 +140,6 @@ logging.basicConfig(level=logging.DEBUG)
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+base_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Dataset')
+features_dataset_path = os.path.join(base_path, '100_Features Dataset')
