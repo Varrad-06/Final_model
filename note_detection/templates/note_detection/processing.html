@@ -81,10 +81,14 @@
                             if (data.result_url && data.result_url !== 'undefined') {
                                 window.location.href = data.result_url;
                             } else {
-                                progressText.html('<p class="text-danger">Error: Could not determine result URL. Please try again.</p>');
+                                let errorMsg = data.error ? data.error : 'Error: Could not determine result URL. Please try again.';
+                                progressText.html('<p class="text-danger">' + errorMsg + '</p>');
                                 console.error('Invalid result_url:', data.result_url, data);
                             }
                         }, 1000);
+                    } else if (data.error) {
+                        progressText.html('<p class="text-danger">' + data.error + '</p>');
+                        console.error('Error from backend:', data.error, data);
                     }
                 },
                 error: function(xhr, status, error) {
