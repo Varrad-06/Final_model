@@ -20,24 +20,23 @@
                 
                 <form method="post" action="{% url 'upload_image' %}" enctype="multipart/form-data" class="mb-3">
                     {% csrf_token %}
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <ul>
+                            {% for field in form %}
+                                {% for error in field.errors %}
+                                    <li>{{ field.label }}: {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                            {% for error in form.non_field_errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
                     <div class="mb-4">
                         <label class="form-label d-block text-center mb-3">Select Currency Denomination</label>
-                        <div class="d-flex justify-content-center gap-3">
-                            <input type="radio" class="btn-check" name="denomination" id="denomination100" value="100" autocomplete="off">
-                            <label class="btn btn-outline-primary btn-lg" for="denomination100">
-                                <i class="bi bi-currency-rupee"></i> 100
-                            </label>
-
-                            <input type="radio" class="btn-check" name="denomination" id="denomination200" value="200" autocomplete="off">
-                            <label class="btn btn-outline-primary btn-lg" for="denomination200">
-                                <i class="bi bi-currency-rupee"></i> 200
-                            </label>
-
-                            <input type="radio" class="btn-check" name="denomination" id="denomination500" value="500" autocomplete="off">
-                            <label class="btn btn-outline-primary btn-lg" for="denomination500">
-                                <i class="bi bi-currency-rupee"></i> 500
-                            </label>
-                        </div>
+                        {{ form.denomination }}
                     </div>
                     
                     <div class="mb-3">

@@ -39,6 +39,9 @@ def home(request):
         if form.is_valid():
             currency_image = form.save()
             return redirect('process_image', image_id=currency_image.id)
+        else:
+            # Render the form with errors
+            return render(request, 'note_detection/home.html', {'form': form})
     else:
         form = ImageUploadForm()
     return render(request, 'note_detection/home.html', {'form': form})
