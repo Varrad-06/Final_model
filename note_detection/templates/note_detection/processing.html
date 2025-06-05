@@ -71,20 +71,25 @@
                 dataType: 'json',
                 success: function(data) {
                     if (data.complete) {
-                        // Clear intervals and redirect to results
                         clearInterval(progressInterval);
                         clearInterval(checkInterval);
-                        
+
                         progressBar.css('width', '100%');
                         progressText.html('<p>Analysis complete! Redirecting to results...</p>');
-                        
+
                         setTimeout(function() {
-                            window.location.href = data.result_url;
+                            if (data.result_url && data.result_url !== 'undefined') {
+                                window.location.href = data.result_url;
+                            } else {
+                                progressText.html('<p class="text-danger">Error: Could not determine result URL. Please try again.</p>');
+                                console.error('Invalid result_url:', data.result_url, data);
+                            }
                         }, 1000);
                     }
                 },
-                error: function() {
-                    console.log('Error checking progress');
+                error: function(xhr, status, error) {
+                    progressText.html('<p class="text-danger">Error checking progress. Please try again.</p>');
+                    console.error('Error checking progress:', xhr, status, error);
                 }
             });
         }
