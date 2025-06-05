@@ -60,6 +60,14 @@ class CurrencyDetector500:
         ]
         
         self.NUM_OF_FEATURES = 7
+        # Debug: Check if Dataset directory exists
+        base_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Dataset')
+        features_dataset_path = os.path.join(base_path, '500_Features Dataset')
+        print(f"[DEBUG] Checking Dataset directory: {features_dataset_path}")
+        if not os.path.exists(features_dataset_path):
+            print(f"[ERROR] Features dataset path does not exist: {features_dataset_path}")
+        else:
+            print(f"[DEBUG] Features dataset path exists: {features_dataset_path}")
         
     def calculate_ssim(self, template_img, query_img):
         min_w = min(template_img.shape[1], query_img.shape[1])
