@@ -73,6 +73,11 @@ def process_image(request, image_id):
                 # Save processed image back to S3
                 _, buffer = cv2.imencode('.jpg', cropped)
                 currency_image.image.save('processed.jpg', ContentFile(buffer.tobytes()))
+                currency_image.refresh_from_db()  # Ensure the new image is loaded
+
+                # Re-open the image for reading
+                image_file = currency_image.image.open('rb')
+                image_file.seek(0)  # Ensure pointer is at start
 
                 # Get the appropriate detector class
                 detector_class = get_detector_class(denomination)
@@ -83,7 +88,7 @@ def process_image(request, image_id):
                     return
                 
                 # Create detector and run detection
-                detector = detector_class(currency_image.image)
+                detector = detector_class(image_file)
                 result = detector.run_detection()
                 
                 # Update the currency image record with results

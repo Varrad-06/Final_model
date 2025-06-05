@@ -18,6 +18,8 @@ class CurrencyDetector100:
         if hasattr(image_file, 'read'):
             file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
             self.test_img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            if self.test_img is None:
+                raise ValueError('Failed to decode image. The file may be corrupted or not a valid image.')
         else:
             # Assume it's a path for backward compatibility
             self.test_img = cv2.imread(image_file)
