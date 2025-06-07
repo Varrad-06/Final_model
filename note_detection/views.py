@@ -15,7 +15,7 @@ import dj_database_url
 
 from .forms import CurrencyImageForm, ImageUploadForm
 from .models import CurrencyImage
-from .detection import CurrencyDetector100
+from .detection_100 import CurrencyDetector100
 from .detection_200 import CurrencyDetector200
 from .detection_500 import CurrencyDetector500
 
