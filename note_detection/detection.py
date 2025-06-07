@@ -24,6 +24,7 @@ class CurrencyDetector100:
         self.test_img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
         if self.test_img is None:
             raise ValueError('Failed to decode image. The file may be corrupted or not a valid image.')
+        print(f"[DEBUG] Detector test_img shape: {self.test_img.shape if self.test_img is not None else 'None'} dtype: {self.test_img.dtype if self.test_img is not None else 'None'}")
         # Resize and preprocess the image
         self.test_img = cv2.resize(self.test_img, (1167, 519))
         self.blur_test_img = cv2.GaussianBlur(self.test_img, (5, 5), 0)

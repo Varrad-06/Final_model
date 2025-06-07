@@ -20,6 +20,7 @@ class CurrencyDetector100:
         self.test_img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
         if self.test_img is None:
             raise ValueError('Failed to decode image. The file may be corrupted or not a valid image.')
+        print(f"[DEBUG] Detector test_img shape: {self.test_img.shape if self.test_img is not None else 'None'} dtype: {self.test_img.dtype if self.test_img is not None else 'None'}")
         self.score_set_list = []
         self.best_extracted_img_list = []
         self.avg_ssim_list = []
