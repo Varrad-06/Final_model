@@ -7,35 +7,23 @@ from io import BytesIO
 import base64
 import pytesseract
 from PIL import Image
-import platform
+import re
 
-# Set the path to the Tesseract executable dynamically
-if platform.system() == 'Windows':
-    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-else:
-    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-print(f"[DEBUG] pytesseract using: {pytesseract.pytesseract.tesseract_cmd}")
+# Set the path to the Tesseract executable
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 class CurrencyDetector100:
-    def __init__(self, image_file):
-        self.file = image_file
-        # Read image from file-like object or bytes
-        if hasattr(image_file, 'read'):
-            file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
-            self.test_img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-            if self.test_img is None:
-                raise ValueError('Failed to decode image. The file may be corrupted or not a valid image.')
-        else:
-            # Assume it's a path for backward compatibility
-            self.test_img = cv2.imread(image_file)
-            self.score_set_list = []
-            self.best_extracted_img_list = []
-            self.avg_ssim_list = []
-            self.left_BL_result = []
-            self.right_BL_result = []
-            self.result_list = []
-            self.number_panel_result = []
-            self.result_images = {}
+    def __init__(self, image_path):
+        self.path = image_path
+        self.test_img = cv2.imread(image_path)
+        self.score_set_list = []
+        self.best_extracted_img_list = []
+        self.avg_ssim_list = []
+        self.left_BL_result = []
+        self.right_BL_result = []
+        self.result_list = []
+        self.number_panel_result = []
+        self.result_images = {}
         
         # Resize and preprocess the image
         self.test_img = cv2.resize(self.test_img, (1167, 519))
@@ -65,14 +53,6 @@ class CurrencyDetector100:
         ]
         
         self.NUM_OF_FEATURES = 7
-        # Debug: Check if Dataset directory exists
-        base_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Dataset')
-        features_dataset_path = os.path.join(base_path, '100_Features Dataset')
-        print(f"[DEBUG] Checking Dataset directory: {features_dataset_path}")
-        if not os.path.exists(features_dataset_path):
-            print(f"[ERROR] Features dataset path does not exist: {features_dataset_path}")
-        else:
-            print(f"[DEBUG] Features dataset path exists: {features_dataset_path}")
         
     def calculate_ssim(self, template_img, query_img):
         min_w = min(template_img.shape[1], query_img.shape[1])
@@ -427,93 +407,30 @@ class CurrencyDetector100:
         self.result_images['feature_9']['count'] = average_count
     
     def test_feature_10(self):
-        # Feature 10: Currency Number Panel
         print('\nANALYSIS OF FEATURE 10: NUMBER PANEL\n')
-        
-        # Cropping out the number panel
         crop = self.gray_test_image[410:510, 690:1090]
         crop_bgr = self.test_img[410:510, 690:1090]
-        
-        # Save the original number panel for display
-        self.result_images['feature_10'] = {
-            'original': crop_bgr
-        }
-        
-        # Apply thresholding to preprocess the image
+        self.result_images['feature_10'] = {'original': crop_bgr}
         gray = cv2.threshold(crop, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-
-        # Apply dilation to connect text components
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
         gray = cv2.dilate(gray, kernel, iterations=1)
-
-        # Find contours
-        contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        # Sort contours from left to right
-        contours = sorted(contours, key=lambda x: cv2.boundingRect(x)[0])
-
-        # Initialize list to store detected characters
-        detected_chars = []
-        copy = crop_bgr.copy()
-
-        # Process each contour
-        for contour in contours:
-            # Get bounding box
-            x, y, w, h = cv2.boundingRect(contour)
-        
-            # Filter out very small contours
-            if w < 10 or h < 10:
-                continue
-
-            # Extract the character region
-            char_region = gray[y:y+h, x:x+w]
-            
-            # Add padding to the character region
-            padding = 5
-            char_region = cv2.copyMakeBorder(char_region, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=255)
-        
-            # Convert to PIL Image for Tesseract
-            pil_image = Image.fromarray(char_region)
-        
-            # Use Tesseract to recognize the character with improved configuration
-            char = pytesseract.image_to_string(pil_image, config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-        
-            # Clean up the recognized character
-            char = char.strip()
-            
-            # Debug print
-            print(f"Contour size: {w}x{h}, Recognized: '{char}'")
-            
-            # Only add if it's a single character
-            if char and len(char) == 1:
-                detected_chars.append(char)
-                # Draw rectangle around the character
-                cv2.rectangle(copy, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                # Add the character text above the box
-                cv2.putText(copy, char, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        
-        print(len(char))
-        # Check if we found exactly 9 characters
-        
-        
-        # Create the result string
-        detected_number = ''.join(char)
-        print(detected_number)
-        test_passed = len(char) == 9
-        # Display final result
+        detected_number = pytesseract.image_to_string(
+            gray,
+            config='--psm 7 --oem 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        )
+        detected_number = detected_number.strip().replace(' ', '').replace('\n', '')
+        detected_number = re.sub(r'[^A-Z0-9]', '', detected_number.upper())
+        print(f"Detected number: '{detected_number}' (length: {len(detected_number)})")
+        test_passed = len(detected_number) == 9
         if test_passed:
             print(f'Test Passed! - Detected number: {detected_number}')
         else:
-            print(f'Test Failed! - Found {len(detected_chars)} characters instead of 9')
+            print(f'Test Failed! - Found {len(detected_number)} characters instead of 9')
             print(f'Detected characters: {detected_number}')
-
-        # Store the result
-        self.number_panel_result = [copy, test_passed]
-        
-        # Update result images dict
-        self.result_images['feature_10']['processed'] = copy
+        self.number_panel_result = [crop_bgr, test_passed]
+        self.result_images['feature_10']['processed'] = crop_bgr
         self.result_images['feature_10']['detected'] = test_passed
-        self.result_images['feature_10']['digit_count'] = len(detected_chars)
+        self.result_images['feature_10']['digit_count'] = len(detected_number)
         self.result_images['feature_10']['detected_number'] = detected_number
     
     def test_result(self):
@@ -546,30 +463,26 @@ class CurrencyDetector100:
         
         # Feature 8: Left Bleed lines
         img, line_count = self.left_BL_result[:]
-        
-        # The feature passes if number of bleed lines is between 4.7 and 5.6
-        if line_count >= 3.7 and line_count <= 5.6:
+        # The feature passes if number of bleed lines is between 3.7 and 4.3
+        if line_count >= 3.7 and line_count <= 4.3:
             status = True
             successful_features_count += 1
             print('Feature 8: Successful - 4 bleed lines found in left part of currency note')
         else:
             status = False
             print('Feature 8: Unsuccessful!')
-        
         self.result_list.append([img, line_count, status])
         
         # Feature 9: Right Bleed lines
         img, line_count = self.right_BL_result[:]
-        
-        # The feature passes if number of bleed lines is between 4.7 and 5.6
-        if line_count >= 3.7 and line_count <= 5.6:
+        # The feature passes if number of bleed lines is between 3.7 and 4.3
+        if line_count >= 3.7 and line_count <= 4.3:
             status = True
             successful_features_count += 1
             print('Feature 9: Successful - 4 bleed lines found in right part of currency note')
         else:
             status = False
             print('Feature 9: Unsuccessful!')
-        
         self.result_list.append([img, line_count, status])
         
         # Feature 10: Currency Number Panel
