@@ -13,9 +13,13 @@ import re
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 class CurrencyDetector100:
-    def __init__(self, image_path):
-        self.path = image_path
-        self.test_img = cv2.imread(image_path)
+    def __init__(self, image_file):
+        self.file = image_file
+        # Always read as file-like object or bytes
+        file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
+        self.test_img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        if self.test_img is None:
+            raise ValueError('Failed to decode image. The file may be corrupted or not a valid image.')
         self.score_set_list = []
         self.best_extracted_img_list = []
         self.avg_ssim_list = []

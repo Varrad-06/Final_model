@@ -19,24 +19,11 @@ print(f"[DEBUG] pytesseract using: {pytesseract.pytesseract.tesseract_cmd}")
 class CurrencyDetector100:
     def __init__(self, image_file):
         self.file = image_file
-        # Read image from file-like object or bytes
-        if hasattr(image_file, 'read'):
-            file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
-            self.test_img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-            if self.test_img is None:
-                raise ValueError('Failed to decode image. The file may be corrupted or not a valid image.')
-        else:
-            # Assume it's a path for backward compatibility
-            self.test_img = cv2.imread(image_file)
-            self.score_set_list = []
-            self.best_extracted_img_list = []
-            self.avg_ssim_list = []
-            self.left_BL_result = []
-            self.right_BL_result = []
-            self.result_list = []
-            self.number_panel_result = []
-            self.result_images = {}
-        
+        # Always read as file-like object or bytes
+        file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
+        self.test_img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        if self.test_img is None:
+            raise ValueError('Failed to decode image. The file may be corrupted or not a valid image.')
         # Resize and preprocess the image
         self.test_img = cv2.resize(self.test_img, (1167, 519))
         self.blur_test_img = cv2.GaussianBlur(self.test_img, (5, 5), 0)
