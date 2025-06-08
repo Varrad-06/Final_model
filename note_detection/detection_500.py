@@ -10,7 +10,10 @@ from PIL import Image
 import re
 
 # Set the path to the Tesseract executable
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+if platform.system() == 'Windows':
+    pytesseract.pytesseract.tesseract_cmd = r'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+else:
+    pytesseract.pytesseract.tesseract_cmd = 'tesseract'
 
 class CurrencyDetector500:
     def __init__(self, image_input):
