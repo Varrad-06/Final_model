@@ -77,6 +77,12 @@ def process_image(request, image_id):
                     currency_image.save()
                     return
                 
+                # Ensure image is 3-channel BGR
+                if len(img.shape) == 2:
+                    img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+                elif img.shape[2] == 4:
+                    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+                
                 denomination = currency_image.denomination
                 
                 # Auto-crop and perspective correct the note before detection
