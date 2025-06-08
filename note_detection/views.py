@@ -69,8 +69,8 @@ def process_image(request, image_id):
             try:
                 # Read image from S3
                 image_file = currency_image.image.open('rb')
-                file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
-                img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+                in_memory_file = np.frombuffer(image_file.read(), np.uint8)
+                img = cv2.imdecode(in_memory_file, cv2.IMREAD_COLOR)
                 if img is None:
                     currency_image.error_message = "Uploaded image could not be read. Please upload a valid image file."
                     currency_image.processing_complete = True

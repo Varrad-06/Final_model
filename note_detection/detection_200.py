@@ -13,9 +13,14 @@ import re
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 class CurrencyDetector200:
-    def __init__(self, image_path):
-        self.path = image_path
-        self.test_img = cv2.imread(image_path)
+    def __init__(self, image_input):
+        self.path = image_input
+        if isinstance(image_input, str):
+            self.test_img = cv2.imread(image_input)
+        else:
+            image_input.seek(0)
+            in_memory_file = np.frombuffer(image_input.read(), np.uint8)
+            self.test_img = cv2.imdecode(in_memory_file, cv2.IMREAD_COLOR)
         self.score_set_list = []
         self.best_extracted_img_list = []
         self.avg_ssim_list = []
