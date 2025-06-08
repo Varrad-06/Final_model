@@ -12,6 +12,8 @@ opencv-python-headless==4.11.0.86
 Pillow==11.1.0
 pytesseract==0.3.13
 scikit-image==0.25.2
+contourpy==1.2.1
+matplotlib==3.8.0
 olefile==0.46
 tifffile==2023.12.9
 tzdata==2023.3
