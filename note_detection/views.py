@@ -59,15 +59,12 @@ def upload_image(request):
     return redirect('home')
 
 def process_image(request, image_id):
-    """Display a page showing that the image is being processed"""
     try:
-        # Get the uploaded image
         currency_image = CurrencyImage.objects.get(id=image_id)
         
-        # Start processing in a separate thread
         def process_in_background():
             try:
-                # Read image from S3
+                # Read image from storage
                 image_file = currency_image.image.open('rb')
                 file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
                 img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
