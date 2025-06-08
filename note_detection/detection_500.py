@@ -7,24 +7,15 @@ from io import BytesIO
 import base64
 import pytesseract
 from PIL import Image
-import platform
+import re
 
-# Set the path to the Tesseract executable dynamically
-if platform.system() == 'Windows':
-    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-else:
-    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-print(f"[DEBUG] pytesseract using: {pytesseract.pytesseract.tesseract_cmd}")
+# Set the path to the Tesseract executable
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 class CurrencyDetector500:
-    def __init__(self, image_file):
-        self.file = image_file
-        # Always read as file-like object or bytes
-        file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
-        self.test_img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-        if self.test_img is None:
-            raise ValueError('Failed to decode image. The file may be corrupted or not a valid image.')
-        print(f"[DEBUG] Detector test_img shape: {self.test_img.shape if self.test_img is not None else 'None'} dtype: {self.test_img.dtype if self.test_img is not None else 'None'}")
+    def __init__(self, image_path):
+        self.path = image_path
+        self.test_img = cv2.imread(image_path)
         self.score_set_list = []
         self.best_extracted_img_list = []
         self.avg_ssim_list = []
@@ -62,14 +53,6 @@ class CurrencyDetector500:
         ]
         
         self.NUM_OF_FEATURES = 7
-        # Debug: Check if Dataset directory exists
-        base_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Dataset')
-        features_dataset_path = os.path.join(base_path, '500_Features Dataset')
-        print(f"[DEBUG] Checking Dataset directory: {features_dataset_path}")
-        if not os.path.exists(features_dataset_path):
-            print(f"[ERROR] Features dataset path does not exist: {features_dataset_path}")
-        else:
-            print(f"[DEBUG] Features dataset path exists: {features_dataset_path}")
         
     def calculate_ssim(self, template_img, query_img):
         min_w = min(template_img.shape[1], query_img.shape[1])
@@ -161,21 +144,21 @@ class CurrencyDetector500:
                 print(f'ANALYSIS OF FEATURE {feature_num} - Using placeholder')
                 
                 # Add dummy values when dataset is missing
-                self.score_set_list.append([0.4])  # Use a more realistic value
-                self.avg_ssim_list.append(0.4)
+                self.score_set_list.append([0.3])  # Use a value below threshold
+                self.avg_ssim_list.append(0.3)
                 
                 # Create a placeholder image with feature number
                 placeholder_img = np.ones((100, 100, 3), dtype=np.uint8) * 255
                 cv2.putText(placeholder_img, f"F{feature_num}", (30, 60), 
                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
                 
-                self.best_extracted_img_list.append([placeholder_img, 0.4])
+                self.best_extracted_img_list.append([placeholder_img, 0.3])
                 
                 # Store in result_images for display
                 self.result_images[f'feature_{feature_num}'] = {
                     'template': placeholder_img,
                     'detected': placeholder_img,
-                    'score': 0.4  # Below threshold but visible for UI
+                    'score': 0.3  # Below threshold but visible for UI
                 }
             return
                 
@@ -264,19 +247,27 @@ class CurrencyDetector500:
                             'score': score
                         }
                 
-            # Storing necessary data
+            # After all templates for this feature
             self.score_set_list.append(score_set)
             print(f'SSIM score set of Feature {j+1}: {score_set}\n')
-            
             if len(score_set) != 0:
                 feat_avg_ssim = sum(score_set) / len(score_set)
                 self.avg_ssim_list.append(feat_avg_ssim)
                 print(f'Average SSIM of Feature {j+1}: {feat_avg_ssim}\n')
+                # Store the average score for display in the template
+                if f'feature_{j+1}' in self.result_images:
+                    self.result_images[f'feature_{j+1}']['score'] = feat_avg_ssim
+                else:
+                    self.result_images[f'feature_{j+1}'] = {'score': feat_avg_ssim}
             else:
                 print('No SSIM scores were found for this feature!')
                 self.avg_ssim_list.append(0.0)
                 print(f'Average SSIM of Feature {j+1}: 0\n')
-            
+                # Store 0.0 as the score for display
+                if f'feature_{j+1}' in self.result_images:
+                    self.result_images[f'feature_{j+1}']['score'] = 0.0
+                else:
+                    self.result_images[f'feature_{j+1}'] = {'score': 0.0}
             self.best_extracted_img_list.append([max_score_img, max_score])
             
     def test_feature_8(self):
@@ -436,81 +427,35 @@ class CurrencyDetector500:
             'original': crop_bgr
         }
         
-        # Apply thresholding to preprocess the image
+        # Preprocess: threshold, denoise, etc.
         gray = cv2.threshold(crop, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-
-        # Apply dilation to connect text components
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
         gray = cv2.dilate(gray, kernel, iterations=1)
 
-        # Find contours
-        contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Use Tesseract on the whole region
+        detected_number = pytesseract.image_to_string(
+            gray,
+            config='--psm 7 --oem 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        )
+        detected_number = detected_number.strip().replace(' ', '').replace('\n', '')
+        # Clean: keep only uppercase letters and digits
+        detected_number = re.sub(r'[^A-Z0-9]', '', detected_number.upper())
 
-        # Sort contours from left to right
-        contours = sorted(contours, key=lambda x: cv2.boundingRect(x)[0])
+        print(f"Detected number: '{detected_number}' (length: {len(detected_number)})")
+        print([ord(c) for c in detected_number])
+        test_passed = len(detected_number) == 9
 
-        # Initialize list to store detected characters
-        detected_chars = []
-        copy = crop_bgr.copy()
-
-        # Process each contour
-        for contour in contours:
-            # Get bounding box
-            x, y, w, h = cv2.boundingRect(contour)
-        
-            # Filter out very small contours
-            if w < 10 or h < 10:
-                continue
-
-            # Extract the character region
-            char_region = gray[y:y+h, x:x+w]
-            
-            # Add padding to the character region
-            padding = 5
-            char_region = cv2.copyMakeBorder(char_region, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=255)
-        
-            # Convert to PIL Image for Tesseract
-            pil_image = Image.fromarray(char_region)
-        
-            # Use Tesseract to recognize the character with improved configuration
-            char = pytesseract.image_to_string(pil_image, config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-        
-            # Clean up the recognized character
-            char = char.strip()
-            
-            # Debug print
-            print(f"Contour size: {w}x{h}, Recognized: '{char}'")
-            
-            # Only add if it's a single character
-            if char and len(char) == 1:
-                detected_chars.append(char)
-                # Draw rectangle around the character
-                cv2.rectangle(copy, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                # Add the character text above the box
-                cv2.putText(copy, char, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        
-        print(len(char))
-        # Check if we found exactly 9 characters
-        
-        
-        # Create the result string
-        detected_number = ''.join(char)
-        print(detected_number)
-        test_passed = len(char) == 9
-        # Display final result
         if test_passed:
             print(f'Test Passed! - Detected number: {detected_number}')
         else:
-            print(f'Test Failed! - Found {len(detected_chars)} characters instead of 9')
+            print(f'Test Failed! - Found {len(detected_number)} characters instead of 9')
             print(f'Detected characters: {detected_number}')
 
         # Store the result
-        self.number_panel_result = [copy, test_passed]
-        
-        # Update result images dict
-        self.result_images['feature_10']['processed'] = copy
+        self.number_panel_result = [crop_bgr, test_passed]
+        self.result_images['feature_10']['processed'] = crop_bgr
         self.result_images['feature_10']['detected'] = test_passed
-        self.result_images['feature_10']['digit_count'] = len(detected_chars)
+        self.result_images['feature_10']['digit_count'] = len(detected_number)
         self.result_images['feature_10']['detected_number'] = detected_number
     
     def test_result(self):
@@ -530,7 +475,7 @@ class CurrencyDetector500:
             status = False
             min_allowed_score = min_ssim_score_list[i]
             
-            # A feature passes if avg SSIM score >= min allowed or max SSIM score >= 0.79
+            print(f"Feature {i+1}: avg_score={avg_score}, max_score={max_score}, min_allowed_score={min_allowed_score}")
             if avg_score >= min_allowed_score or max_score >= 0.79:
                 status = True
                 successful_features_count += 1
@@ -542,43 +487,33 @@ class CurrencyDetector500:
             self.result_list.append([img, avg_score, max_score, status])
         
         # Feature 8: Left Bleed lines
-        img, line_count = self.left_BL_result[:]
-        
-        # The feature passes if number of bleed lines is between 4.7 and 5.6
-        if line_count >= 4.7 and line_count <= 5.6:
-            status = True
+        img8, line_count8 = self.left_BL_result[:]
+        status8 = line_count8 >= 4.7 and line_count8 <= 5.6
+        if status8:
             successful_features_count += 1
             print('Feature 8: Successful - 5 bleed lines found in left part of currency note')
         else:
-            status = False
             print('Feature 8: Unsuccessful!')
-        
-        self.result_list.append([img, line_count, status])
+        self.result_list.append([img8, line_count8, status8])
         
         # Feature 9: Right Bleed lines
-        img, line_count = self.right_BL_result[:]
-        
-        # The feature passes if number of bleed lines is between 4.7 and 5.6
-        if line_count >= 4.7 and line_count <= 5.6:
-            status = True
+        img9, line_count9 = self.right_BL_result[:]
+        status9 = line_count9 >= 4.7 and line_count9 <= 5.6
+        if status9:
             successful_features_count += 1
             print('Feature 9: Successful - 5 bleed lines found in right part of currency note')
         else:
-            status = False
             print('Feature 9: Unsuccessful!')
-        
-        self.result_list.append([img, line_count, status])
+        self.result_list.append([img9, line_count9, status9])
         
         # Feature 10: Currency Number Panel
-        img, status = self.number_panel_result[:]
-        
-        if status:
+        img10, status10 = self.number_panel_result[:2]  # Only take the first two elements
+        if status10:
             successful_features_count += 1
             print('Feature 10: Successful - 9 digits found in number panel of currency note')
         else:
             print('Feature 10: Unsuccessful!')
-        
-        self.result_list.append([img, status])
+        self.result_list.append([img10, status10])
         
         # Final Result
         print('\nResult Summary:')

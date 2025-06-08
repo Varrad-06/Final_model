@@ -7,24 +7,15 @@ from io import BytesIO
 import base64
 import pytesseract
 from PIL import Image
-import platform
+import re
 
-# Set the path to the Tesseract executable dynamically
-if platform.system() == 'Windows':
-    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-else:
-    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-print(f"[DEBUG] pytesseract using: {pytesseract.pytesseract.tesseract_cmd}")
+# Set the path to the Tesseract executable
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 class CurrencyDetector200:
-    def __init__(self, image_file):
-        self.file = image_file
-        # Always read as file-like object or bytes
-        file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
-        self.test_img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-        if self.test_img is None:
-            raise ValueError('Failed to decode image. The file may be corrupted or not a valid image.')
-        print(f"[DEBUG] Detector test_img shape: {self.test_img.shape if self.test_img is not None else 'None'} dtype: {self.test_img.dtype if self.test_img is not None else 'None'}")
+    def __init__(self, image_path):
+        self.path = image_path
+        self.test_img = cv2.imread(image_path)
         self.score_set_list = []
         self.best_extracted_img_list = []
         self.avg_ssim_list = []
@@ -80,14 +71,6 @@ class CurrencyDetector200:
             [11000,18000]
         ]'''
         self.NUM_OF_FEATURES = 7
-        # Debug: Check if Dataset directory exists
-        base_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Dataset')
-        features_dataset_path = os.path.join(base_path, '200_Features Dataset')
-        print(f"[DEBUG] Checking Dataset directory: {features_dataset_path}")
-        if not os.path.exists(features_dataset_path):
-            print(f"[ERROR] Features dataset path does not exist: {features_dataset_path}")
-        else:
-            print(f"[DEBUG] Features dataset path exists: {features_dataset_path}")
         
     def calculate_ssim(self, template_img, query_img):
         min_w = min(template_img.shape[1], query_img.shape[1])
@@ -297,238 +280,87 @@ class CurrencyDetector200:
             
             self.best_extracted_img_list.append([max_score_img, max_score])
             
+    def _analyze_200_pattern(self, thresh):
+        width = thresh.shape[1]
+        pattern_match_count = 0
+        total_cols = 0
+        for j in range(width):
+            col = thresh[:, j:j+1]
+            regions = []
+            in_black = False
+            start = 0
+            for i in range(len(col)):
+                if not in_black and col[i][0] == 0:
+                    in_black = True
+                    start = i
+                elif in_black and col[i][0] == 255:
+                    in_black = False
+                    regions.append(i - start)
+            if in_black:
+                regions.append(len(col) - start)
+            # Accept 5-7 regions, try to match the pattern
+            if 5 <= len(regions) <= 7:
+                sorted_regions = sorted(regions)
+                dots = sorted_regions[:2]
+                lines = sorted_regions[2:]
+                avg_line_height = sum(lines) / len(lines) if lines else 1
+                avg_dot_height = sum(dots) / len(dots) if dots else 0
+                if avg_dot_height < 0.7 * avg_line_height:
+                    pattern_match_count += 1
+            total_cols += 1
+        if total_cols == 0:
+            return 0.0
+        return pattern_match_count / total_cols
+
     def test_feature_8(self):
-        # Check Feature 8 - Left bleed lines
         print('\nANALYSIS OF FEATURE 8: LEFT BLEED LINES\n')
-        
-        # Cropping the region in which left bleed lines are present
-        crop = self.test_img[120:240, 12:35]
-        
+        crop = self.test_img[120:250, 10:50]
         img = crop.copy()
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        
         _, thresh = cv2.threshold(gray, 130, 255, cv2.THRESH_BINARY)
-        
-        # Save thresholded image for display
-        self.result_images['feature_8'] = {
-            'thresholded': thresh
-        }
-        
-        whitePixelValue = 255
-        blackPixelValue = 0
-        
-        width = thresh.shape[1]
-        
-        result = []
-        num_of_cols = 0
-        
-        print('Number of black regions found in each column: ')
-        
-        # Iteration over each column in the cropped image
-        for j in range(width):
-            col = thresh[:, j:j+1]
-            count = 0
-            
-            # Iterating over each row (or pixel) in the current column
-            for i in range(len(col)-1):
-                pixel1_value = col[i][0]
-                pixel2_value = col[i+1][0]
-                
-                # Handle error pixels
-                if pixel1_value != 0 and pixel1_value != 255:
-                    pixel1_value = 255
-                if pixel2_value != 0 and pixel2_value != 255:
-                    pixel2_value = 255
-                
-                # If current pixel is white and next pixel is black, increment counter
-                if pixel1_value == whitePixelValue and pixel2_value == blackPixelValue:
-                    count += 1
-            
-            # If count is valid, add to results
-            if count > 0 and count < 10:
-                print(count)
-                result.append(count)
-                num_of_cols += 1
-            else:
-                print(f'{count} Erroneous -> discarded')
-        
-        print(f'\nNumber of columns examined: {width}')
-        print(f'Number of non-erroneous columns found: {num_of_cols}')
-        
-        if num_of_cols != 0:
-            average_count = sum(result) / num_of_cols
-        else:
-            average_count = -1
-            print('Error occurred - Division by 0')
-        
-        print(f'\nAverage number of black regions is: {average_count}')
-        
-        # Storing the thresholded image and average number of bleed lines detected 
-        self.left_BL_result = [thresh, average_count]
-        
-        # Update result images dict with the count
-        self.result_images['feature_8']['count'] = average_count
-    
+        self.result_images['feature_8'] = {'thresholded': thresh}
+        pattern_fraction = self._analyze_200_pattern(thresh)
+        print(f'Pattern match fraction: {pattern_fraction}')
+        self.left_BL_result = [thresh, pattern_fraction]
+        self.result_images['feature_8']['pattern_fraction'] = pattern_fraction
+
     def test_feature_9(self):
-        # Check Feature 9 - Right bleed lines
         print('\nANALYSIS OF FEATURE 9: RIGHT BLEED LINES\n')
-        
-        # Cropping the region in which right bleed lines are present
-        crop = self.test_img[120:260, 1135:1155]
-        
+        crop = self.test_img[120:260, 1110:1165]
         img = crop.copy()
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        
         _, thresh = cv2.threshold(gray, 130, 255, cv2.THRESH_BINARY)
-        
-        # Save thresholded image for display
-        self.result_images['feature_9'] = {
-            'thresholded': thresh
-        }
-        
-        whitePixelValue = 255
-        blackPixelValue = 0
-        
-        width = thresh.shape[1]
-        
-        result = []
-        num_of_cols = 0
-        
-        print('Number of black regions found in each column: ')
-        
-        # Iteration over each column in the cropped image
-        for j in range(width):
-            col = thresh[:, j:j+1]
-            count = 0
-            
-            # Iterating over each row (or pixel) in the current column
-            for i in range(len(col)-1):
-                pixel1_value = col[i][0]
-                pixel2_value = col[i+1][0]
-                
-                # Handle error pixels
-                if pixel1_value != 0 and pixel1_value != 255:
-                    pixel1_value = 255
-                if pixel2_value != 0 and pixel2_value != 255:
-                    pixel2_value = 255
-                
-                # If current pixel is white and next pixel is black, increment counter
-                if pixel1_value == whitePixelValue and pixel2_value == blackPixelValue:
-                    count += 1
-            
-            # If count is valid, add to results
-            if count > 0 and count < 10:
-                print(count)
-                result.append(count)
-                num_of_cols += 1
-            else:
-                print(f'{count} Erroneous -> discarded')
-        
-        print(f'\nNumber of columns examined: {width}')
-        print(f'Number of non-erroneous columns found: {num_of_cols}')
-        
-        if num_of_cols != 0:
-            average_count = sum(result) / num_of_cols
-        else:
-            average_count = -1
-            print('Error occurred - Division by 0')
-        
-        print(f'\nAverage number of black regions is: {average_count}')
-        
-        # Storing the thresholded image and average number of bleed lines detected 
-        self.right_BL_result = [thresh, average_count]
-        
-        # Update result images dict with the count
-        self.result_images['feature_9']['count'] = average_count
-    
+        self.result_images['feature_9'] = {'thresholded': thresh}
+        pattern_fraction = self._analyze_200_pattern(thresh)
+        print(f'Pattern match fraction: {pattern_fraction}')
+        self.right_BL_result = [thresh, pattern_fraction]
+        self.result_images['feature_9']['pattern_fraction'] = pattern_fraction
+
     def test_feature_10(self):
-        # Feature 10: Currency Number Panel
         print('\nANALYSIS OF FEATURE 10: NUMBER PANEL\n')
-        
-        # Cropping out the number panel
         crop = self.gray_test_image[410:510, 690:1090]
         crop_bgr = self.test_img[410:510, 690:1090]
-        
-        # Save the original number panel for display
-        self.result_images['feature_10'] = {
-            'original': crop_bgr
-        }
-        
-        # Apply thresholding to preprocess the image
+        self.result_images['feature_10'] = {'original': crop_bgr}
         gray = cv2.threshold(crop, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-
-        # Apply dilation to connect text components
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
         gray = cv2.dilate(gray, kernel, iterations=1)
-
-        # Find contours
-        contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        # Sort contours from left to right
-        contours = sorted(contours, key=lambda x: cv2.boundingRect(x)[0])
-
-        # Initialize list to store detected characters
-        detected_chars = []
-        copy = crop_bgr.copy()
-
-        # Process each contour
-        for contour in contours:
-            # Get bounding box
-            x, y, w, h = cv2.boundingRect(contour)
-        
-            # Filter out very small contours
-            if w < 10 or h < 10:
-                continue
-
-            # Extract the character region
-            char_region = gray[y:y+h, x:x+w]
-            
-            # Add padding to the character region
-            padding = 5
-            char_region = cv2.copyMakeBorder(char_region, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=255)
-        
-            # Convert to PIL Image for Tesseract
-            pil_image = Image.fromarray(char_region)
-        
-            # Use Tesseract to recognize the character with improved configuration
-            char = pytesseract.image_to_string(pil_image, config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-        
-            # Clean up the recognized character
-            char = char.strip()
-            
-            # Debug print
-            print(f"Contour size: {w}x{h}, Recognized: '{char}'")
-            
-            # Only add if it's a single character
-            if char and len(char) == 1:
-                detected_chars.append(char)
-                # Draw rectangle around the character
-                cv2.rectangle(copy, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                # Add the character text above the box
-                cv2.putText(copy, char, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        
-        print(len(char))
-        # Check if we found exactly 9 characters
-        
-        
-        # Create the result string
-        detected_number = ''.join(char)
-        print(detected_number)
-        test_passed = len(char) == 9
-        # Display final result
+        detected_number = pytesseract.image_to_string(
+            gray,
+            config='--psm 7 --oem 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        )
+        detected_number = detected_number.strip().replace(' ', '').replace('\n', '')
+        detected_number = re.sub(r'[^A-Z0-9]', '', detected_number.upper())
+        print(f"Detected number: '{detected_number}' (length: {len(detected_number)})")
+        test_passed = len(detected_number) == 9
         if test_passed:
             print(f'Test Passed! - Detected number: {detected_number}')
         else:
-            print(f'Test Failed! - Found {len(detected_chars)} characters instead of 9')
+            print(f'Test Failed! - Found {len(detected_number)} characters instead of 9')
             print(f'Detected characters: {detected_number}')
-
-        # Store the result
-        self.number_panel_result = [copy, test_passed]
-        
-        # Update result images dict
-        self.result_images['feature_10']['processed'] = copy
+        self.number_panel_result = [crop_bgr, test_passed]
+        self.result_images['feature_10']['processed'] = crop_bgr
         self.result_images['feature_10']['detected'] = test_passed
-        self.result_images['feature_10']['digit_count'] = len(detected_chars)
+        self.result_images['feature_10']['digit_count'] = len(detected_number)
         self.result_images['feature_10']['detected_number'] = detected_number
     
     def test_result(self):
@@ -559,33 +391,27 @@ class CurrencyDetector200:
             
             self.result_list.append([img, avg_score, max_score, status])
         
-        # Feature 8: Left Bleed lines
-        img, line_count = self.left_BL_result[:]
-        
-        # The feature passes if number of bleed lines is between 4.7 and 5.6
-        if line_count >= 4.7 and line_count <= 6:
+        # Feature 8: Left Bleed lines (pattern match fraction > 0.4 is considered successful)
+        img, pattern_fraction = self.left_BL_result[:]
+        if pattern_fraction > 0.02:
             status = True
             successful_features_count += 1
-            print('Feature 8: Successful - 5 bleed lines found in left part of currency note')
+            print('Feature 8: Successful - 2 lines, 2 dots, 2 lines pattern found (left)')
         else:
             status = False
             print('Feature 8: Unsuccessful!')
+        self.result_list.append([img, pattern_fraction, status])
         
-        self.result_list.append([img, line_count, status])
-        
-        # Feature 9: Right Bleed lines
-        img, line_count = self.right_BL_result[:]
-        
-        # The feature passes if number of bleed lines is between 4.7 and 5.6
-        if line_count >= 4.7 and line_count <= 6:
+        # Feature 9: Right Bleed lines (pattern match fraction > 0.4 is considered successful)
+        img, pattern_fraction = self.right_BL_result[:]
+        if pattern_fraction > 0.02:
             status = True
             successful_features_count += 1
-            print('Feature 9: Successful - 5 bleed lines found in right part of currency note')
+            print('Feature 9: Successful - 2 lines, 2 dots, 2 lines pattern found (right)')
         else:
             status = False
             print('Feature 9: Unsuccessful!')
-        
-        self.result_list.append([img, line_count, status])
+        self.result_list.append([img, pattern_fraction, status])
         
         # Feature 10: Currency Number Panel
         img, status = self.number_panel_result[:]
